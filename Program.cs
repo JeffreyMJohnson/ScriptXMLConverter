@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Xml;
+using System.IO;
 
 namespace ScriptXMLConvert
 {
@@ -9,7 +10,10 @@ namespace ScriptXMLConvert
     ///     <script>
     ///        <act number="1">
     ///           <scene number="1">
-    ///               <moment title="foo" line="bar"/>
+    ///               <text>[TEXT OF SCRIPT FOR THIS SCENE]</text>
+    ///               <moments>
+    ///                  <moment title="foo" line="bar"/>
+    ///               </moments>
     ///            </scene>
     ///       </act>
     ///     </script>
@@ -33,12 +37,66 @@ namespace ScriptXMLConvert
         private static XmlDocument sceneBreakdown = new XmlDocument();
         private static XmlDocument originalFile = new XmlDocument();
         private static string defaultNameSpace = "urn:schemas-microsoft-com:office:spreadsheet";
+        private static StreamReader scriptFileStream;
 
         static void Main(string[] args)
         {
             originalFile.Load("SCENE BREAKDOWN - KANSAS.xml");
             BuildSceneBreakdown();
+            scriptFileStream = new StreamReader("SCRIPT-CODENAMEKANSAS.txt");
+            AddScriptText();
+
             sceneBreakdown.Save("SceneBreakdown.xml");
+
+        }
+
+        /// <summary>
+        /// Break up the script text into scenes and add it to xmlfile. Note there is a CHARACTERS section in beginning that is not being 
+        /// included. This could be put into seperate section if customer wants.
+        /// </summary>
+        private static void AddScriptText()
+        {
+            //load the file into a string
+            string scriptText = scriptFileStream.ReadToEnd();
+
+            //loop through the scenes in the xml file and add text script using "SCENE " as delimiter.
+            //scenes are in order so can assume act
+            XmlNodeList scenes = sceneBreakdown.SelectNodes("script/act/scene");
+
+            int cursorIndex = 0;
+            for(int i = 0; i < scenes.Count; i++)
+            {
+                //set cursor to beginning of the "Act ..." for this scene
+                int sceneNum = int.Parse(scenes[i].Attributes.GetNamedItem("number").Value);
+                int sceneIndex = scriptText.IndexOf("SCENE " + sceneNum, cursorIndex);
+                string sceneText;
+                int nextSceneIndex;
+                //need next scene location (if one) for end delim
+                if(i + 1 < scenes.Count)
+                {
+                    int nextSceneNum = int.Parse(scenes[i + 1].Attributes.GetNamedItem("number").Value);
+                    nextSceneIndex = scriptText.IndexOf("SCENE " + nextSceneNum, sceneIndex);
+                    sceneText = scriptText.Substring(sceneIndex, nextSceneIndex - sceneIndex);
+                    cursorIndex = nextSceneIndex;
+                }
+                else
+                {
+                    sceneText = scriptText.Substring(sceneIndex);
+                    cursorIndex = scriptText.Length;
+                }
+                //create the node
+                XmlElement text = sceneBreakdown.CreateElement("text");
+                text.InnerText = sceneText;
+                //add data as cdata because text has illegal xml chars
+                //XmlCDataSection data = sceneBreakdown.CreateCDataSection(sceneText);
+                //text.AppendChild(data);
+
+                scenes[i].AppendChild(text);
+                
+
+
+            }
+
         }
 
         static void BuildSceneBreakdown()
