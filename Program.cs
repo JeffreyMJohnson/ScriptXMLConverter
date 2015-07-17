@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Xml;
 using System.IO;
-
+using System.Xml;
 namespace ScriptXMLConvert
 {
 
@@ -39,6 +38,8 @@ namespace ScriptXMLConvert
         private static string defaultNameSpace = "urn:schemas-microsoft-com:office:spreadsheet";
         private static StreamReader scriptFileStream;
 
+        
+
         static void Main(string[] args)
         {
             originalFile.Load("SCENE BREAKDOWN - KANSAS.xml");
@@ -57,7 +58,27 @@ namespace ScriptXMLConvert
         private static void AddScriptText()
         {
             //load the file into a string
-            string scriptText = scriptFileStream.ReadToEnd();
+            //string scriptText = scriptFileStream.ReadToEnd();
+            string scriptText = "";
+
+            while(scriptFileStream.Peek() >= 0)
+            {
+                string line = scriptFileStream.ReadLine();
+                string cleanedLine = "";
+
+                for (int i = 0; i < line.Length; i++)
+                {
+                    int ascii = (int)line[i];
+                    char c = line[i];
+                    if(ascii > 31 && ascii < 127)
+                    {
+                        cleanedLine += c;
+                    }
+                }
+                scriptText += cleanedLine + "\n";
+
+            }
+           
 
             //loop through the scenes in the xml file and add text script using "SCENE " as delimiter.
             //scenes are in order so can assume act
