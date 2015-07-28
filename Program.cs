@@ -228,7 +228,7 @@ namespace ScriptXMLConvert
 
                 //get scene number
                 string scene = cellsList[(int)ColumnHeader.Scene].Text;
-                
+
 
                 //create new scene node and set the data if new
                 if (scene != currentScene)
@@ -259,17 +259,27 @@ namespace ScriptXMLConvert
                 //add line attribute
                 XmlAttribute lineNode = sceneBreakdown.CreateAttribute("line");
                 //lineNode.Value = GetCellData(ColumnHeader.Line, cellsList);
-                if(null != cellsList[(int)ColumnHeader.Line])
+                if (null != cellsList[(int)ColumnHeader.Line])
                 {
-lineNode.Value = cellsList[(int)ColumnHeader.Line].Text;
+                    lineNode.Value = cellsList[(int)ColumnHeader.Line].Text;
                 }
                 else
                 {
                     lineNode.Value = "";
                 }
-                
-                
                 momentNode.Attributes.Append(lineNode);
+
+                //add duration attribute
+                XmlAttribute durationNode = sceneBreakdown.CreateAttribute("duration");
+                if (null != cellsList[(int)ColumnHeader.Duration])
+                {
+                    durationNode.Value = cellsList[(int)ColumnHeader.Duration].Text;
+                }
+                else
+                {
+                    durationNode.Value = "";
+                }
+                momentNode.Attributes.Append(durationNode);
 
                 //write to scene parent
                 sceneNode.AppendChild(momentNode);
@@ -315,7 +325,7 @@ lineNode.Value = cellsList[(int)ColumnHeader.Line].Text;
         {
             //check if cell 1 has data and cell 2 has none
             //if (cellsList.Item(0).ChildNodes.Count == 1 && cellsList.Item(1).ChildNodes.Count == 0)
-            if(NumberOfFilledCells(cellsList) == 1)
+            if (NumberOfFilledCells(cellsList) == 1)
             {
                 return true;
             }
