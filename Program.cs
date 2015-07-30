@@ -48,7 +48,7 @@ namespace ScriptXMLConvert
 
         static void Main(string[] args)
         {
-            originalFile.Load("SCENE BREAKDOWN - KANSAS.xml");
+            //originalFile.Load("SCENE BREAKDOWN - KANSAS.xml");
             //BuildSceneBreakdown();
             BuildSceneBreakdown();
             //scriptFileStream = new StreamReader("SCRIPT-CODENAMEKANSAS.txt");
@@ -192,6 +192,12 @@ namespace ScriptXMLConvert
                     continue;
                 }
 
+                //skip time and total duration rows
+                if (cellsList[(int)ColumnHeader.Scene].Text == "TIME" || cellsList[(int)ColumnHeader.Scene].Text == "SCRIPT TOTAL DURATION")
+                {
+                    continue;
+                }
+
 
                 //check if this is a row declaring the Act
                 if (IsActRow(cellsList))
@@ -287,8 +293,44 @@ namespace ScriptXMLConvert
 
             }
             //append scene to act
+            actNode.AppendChild(sceneNode);
+            scriptNode.AppendChild(actNode);
 
+            SetSceneTimes(rowsList);
+        }
 
+        static void SetSceneTimes(Row[] rows)
+        {
+            int currentAct = 0;
+            for(int i = 0; i < rows.Length; i++)
+            {
+                Cell[] cells = rows[i].Cells;
+                if(IsActRow(cells))
+                {
+                    string innerText = cells[(int)ColumnHeader.Scene].Text;
+                    string actNum = innerText.Substring(innerText.LastIndexOf(' ') + 1);
+                    currentAct = int.Parse(actNum);
+                }
+
+                if(cells[(int)ColumnHeader.Scene].Text == "TIME")
+                {
+                    if(i + 1 < rows.Length)
+                    {
+                        string scene = rows[i + 1].Cells[(int)ColumnHeader.Scene].Text;
+                        XmlNode sceneNode = sceneBreakdown.SelectSingleNode("script/act[@number='" + currentAct + "']/scene[@number='" + scene + "']");
+                        XmlAttribute timeNode = sceneBreakdown.CreateAttribute("time");
+                        timeNode.Value = cells[(int)ColumnHeader.Duration].Text;
+                        sceneNode.Attributes.Append(timeNode);
+
+                    }
+                }
+                if(cells[(int)ColumnHeader.Scene].Text == "SCRIPT TOTAL DURATION")
+                {
+                    XmlAttribute timeNode = sceneBreakdown.CreateAttribute("filmLength");
+                    timeNode.Value = cells[(int)ColumnHeader.Duration].Text;
+                    sceneBreakdown.FirstChild.Attributes.Append(timeNode);
+                }
+            }
         }
 
 
