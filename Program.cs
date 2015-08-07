@@ -1,8 +1,10 @@
 ﻿using System;
-using System.IO;
+using System.Net;
 using System.Xml;
 using Excel;
 using System.Collections.Generic;
+using Google.GData.Client;
+using Google.GData.Spreadsheets;
 
 
 namespace ScriptXMLConvert
@@ -46,7 +48,7 @@ namespace ScriptXMLConvert
 
 
 
-
+        [STAThread]
         static void Main(string[] args)
         {
             BuildSceneBreakdown();
@@ -61,6 +63,84 @@ namespace ScriptXMLConvert
             sceneBreakdown.Save("SceneBreakdown.xml");
 
         }
+
+        
+        static void GetRows()
+        {
+            //OAuth config
+            string CLIENT_ID = "898242977449-gdhq44lj4h22jgv2gougnaktg6i482p9.apps.googleusercontent.com";
+            string CLIENT_SECRET = "kiR_ogLwko8r_HviWpSWyj2p";
+            string SCOPE = "https://spreadsheets.google.com/feeds";
+            string REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob";
+
+            //setup OAuth object
+            OAuth2Parameters parameters = new OAuth2Parameters();
+            parameters.ClientId = CLIENT_ID;
+            parameters.ClientSecret = CLIENT_SECRET;
+            parameters.RedirectUri = REDIRECT_URI;
+            parameters.Scope = SCOPE;
+
+            //get auth URL
+            string authorizationUrl = OAuthUtil.CreateOAuth2AuthorizationUrl(parameters);
+            System.Windows.Forms.Clipboard.Clear();
+            Console.WriteLine(authorizationUrl);
+            System.Windows.Forms.Clipboard.SetText(authorizationUrl);
+            Console.WriteLine("Please visit the URL above to authorize your OAuth " + "request token.  Once that is complete, type in your access code to "
+                + "continue...");
+            parameters.AccessCode = Console.ReadLine();
+
+            OAuthUtil.GetAccessToken(parameters);
+            string accessToken = parameters.AccessToken;
+            Console.WriteLine("OAuth Access Token: " + accessToken);
+
+            GOAuth2RequestFactory requestFactory = new GOAuth2RequestFactory(null, "MySpreadsheetIntegration-v1", parameters);
+            SpreadsheetsService service = new SpreadsheetsService("MySpreadsheetIntegration-v1");
+            service.RequestFactory = requestFactory;
+
+            // Instantiate a SpreadsheetQuery object to retrieve spreadsheets.
+            SpreadsheetQuery query = new SpreadsheetQuery();
+
+            // Make a request to the API and get all spreadsheets.
+            SpreadsheetFeed feed = service.Query(query);
+
+            if (feed.Entries.Count == 0)
+            {
+                // TODO: There were no spreadsheets, act accordingly.
+            }
+
+            // TODO: Choose a spreadsheet more intelligently based on your
+            // app's needs.
+            SpreadsheetEntry spreadsheet = (SpreadsheetEntry)feed.Entries[0];
+            Console.WriteLine(spreadsheet.Title.Text);
+
+            // Get the first worksheet of the first spreadsheet.
+            // TODO: Choose a worksheet more intelligently based on your
+            // app's needs.
+            WorksheetFeed wsFeed = spreadsheet.Worksheets;
+            WorksheetEntry worksheet = (WorksheetEntry)wsFeed.Entries[0];
+
+            // Define the URL to request the list feed of the worksheet.
+            AtomLink listFeedLink = worksheet.Links.FindService(GDataSpreadsheetsNameTable.ListRel, null);
+
+            // Fetch the list feed of the worksheet.
+            ListQuery listQuery = new ListQuery(listFeedLink.HRef.ToString());
+            ListFeed listFeed = service.Query(listQuery);
+
+            // Iterate through each row, printing its cell values.
+            foreach (ListEntry row in listFeed.Entries)
+            {
+                // Print the first column's cell value
+                Console.WriteLine(row.Title.Text);
+                // Iterate over the remaining columns, and print each cell value
+                foreach (ListEntry.Custom element in row.Elements)
+                {
+                    Console.WriteLine(element.Value);
+                }
+            }
+
+
+        }
+        
 
 
 
@@ -92,6 +172,9 @@ namespace ScriptXMLConvert
             IEnumerator<worksheet> sheets = Workbook.Worksheets("SCENE BREAKDOWN - KANSAS.xlsx").GetEnumerator();
             sheets.MoveNext();
             Row[] rowsList = sheets.Current.Rows;
+
+            //DEBUG
+            GetRows();
 
             XmlElement actNode = null;
             XmlElement sceneNode = null;
