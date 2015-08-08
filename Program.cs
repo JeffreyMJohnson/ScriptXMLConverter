@@ -51,7 +51,8 @@ namespace ScriptXMLConvert
         [STAThread]
         static void Main(string[] args)
         {
-            BuildSceneBreakdown();
+            //BuildSceneBreakdown();
+            BuildSceneBreakdown2();
 
             /*
              *This is commented to remove the script text from the outputed data file.  If want it in uncomment the next 2 lines.
@@ -65,7 +66,7 @@ namespace ScriptXMLConvert
         }
 
         
-        static void GetRows()
+        static ListFeed GetRows()
         {
             //OAuth config
             string CLIENT_ID = "898242977449-gdhq44lj4h22jgv2gougnaktg6i482p9.apps.googleusercontent.com";
@@ -125,20 +126,7 @@ namespace ScriptXMLConvert
             // Fetch the list feed of the worksheet.
             ListQuery listQuery = new ListQuery(listFeedLink.HRef.ToString());
             ListFeed listFeed = service.Query(listQuery);
-
-            // Iterate through each row, printing its cell values.
-            foreach (ListEntry row in listFeed.Entries)
-            {
-                // Print the first column's cell value
-                Console.WriteLine(row.Title.Text);
-                // Iterate over the remaining columns, and print each cell value
-                foreach (ListEntry.Custom element in row.Elements)
-                {
-                    Console.WriteLine(element.Value);
-                }
-            }
-
-
+            return listFeed;
         }
         
 
@@ -162,6 +150,98 @@ namespace ScriptXMLConvert
             return null == cell || cell.Text == "";
         }
 
+        static Script LoadScript()
+        {
+            ListFeed listFeed = GetRows();
+            Script script = new Script();
+            Act act = null;
+            Scene scene = null;
+
+            //loop rows
+            foreach (ListEntry row in listFeed.Entries)
+            {
+                string sceneValue = row.Elements[(int)ColumnHeader.Scene].Value;
+
+                //is act label
+                if (sceneValue.Contains("ACT "))
+                {
+                    //if not first
+                    if(null != act)
+                    {
+                        act.AddScene(scene);
+                        scene = null;
+                        script.AddAct(act);
+                    }
+                    act = new Act();
+                    act.Number = sceneValue.Substring(sceneValue.LastIndexOf(' '));
+                    //go to next row
+                    continue;
+                }
+
+                //if new scene
+                if(sceneValue.Contains("TIME"))
+                {
+                    //if not first scene 
+                    if(null != scene)
+                    {
+                        act.AddScene(scene);
+                    }
+                    scene = new Scene();
+                    scene.Time = row.Elements[(int)ColumnHeader.Duration].Value;
+                    //go to next row
+                    continue;
+                }
+
+                //if last element
+                if(sceneValue.Contains("SCRIPT TOTAL"))
+                {
+                    script.TotalTime = row.Elements[(int)ColumnHeader.Duration].Value;
+                    //add last scene to last act
+                    act.AddScene(scene);
+                    //add last act to script
+                    script.AddAct(act);
+                    //all done no need to continue checking rows
+                    break;
+                }
+
+                //not above so it's a new moment
+                Moment moment = new Moment(row.Elements[(int)ColumnHeader.Moment].Value,
+                                           row.Elements[(int)ColumnHeader.Line].Value,
+                                           row.Elements[(int)ColumnHeader.Duration].Value,
+                                           row.Elements[(int)ColumnHeader.Location].Value,
+                                           row.Elements[(int)ColumnHeader.SFX].Value);
+                if(scene.Number != row.Elements[(int)ColumnHeader.Scene].Value)
+                {
+                    scene.Number = row.Elements[(int)ColumnHeader.Scene].Value;
+                }
+                scene.AddMoment(moment);
+            }
+            return script;
+
+        }
+
+
+
+        static void BuildSceneBreakdown2()
+        {
+            //Create Script object
+            Script script = LoadScript();
+
+            //create root
+            XmlElement scriptNode = sceneBreakdown.CreateElement("script");
+            sceneBreakdown.AppendChild(scriptNode);
+
+            
+
+            XmlElement actNode = null;
+            XmlElement sceneNode = null;
+            string currentScene = "0";
+
+
+
+        }
+
+
         static void BuildSceneBreakdown()
         {
             //create root
@@ -172,9 +252,6 @@ namespace ScriptXMLConvert
             IEnumerator<worksheet> sheets = Workbook.Worksheets("SCENE BREAKDOWN - KANSAS.xlsx").GetEnumerator();
             sheets.MoveNext();
             Row[] rowsList = sheets.Current.Rows;
-
-            //DEBUG
-            GetRows();
 
             XmlElement actNode = null;
             XmlElement sceneNode = null;
