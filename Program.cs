@@ -1,10 +1,7 @@
-﻿using System;
-using System.Net;
-using System.Xml;
-using Excel;
-using System.Collections.Generic;
-using Google.GData.Client;
+﻿using Google.GData.Client;
 using Google.GData.Spreadsheets;
+using System;
+using System.Xml;
 
 
 namespace ScriptXMLConvert
@@ -51,8 +48,7 @@ namespace ScriptXMLConvert
         [STAThread]
         static void Main(string[] args)
         {
-            //BuildSceneBreakdown();
-            BuildSceneBreakdown2();
+            BuildSceneBreakdown();
 
             /*
              *This is commented to remove the script text from the outputed data file.  If want it in uncomment the next 2 lines.
@@ -130,26 +126,6 @@ namespace ScriptXMLConvert
         }
         
 
-
-
-        static int NumberOfFilledCells(Cell[] cellsList)
-        {
-            int result = 0;
-            foreach (Cell cell in cellsList)
-            {
-                if (!IsCellEmpty(cell))
-                {
-                    result++;
-                }
-            }
-            return result;
-        }
-
-        static bool IsCellEmpty(Cell cell)
-        {
-            return null == cell || cell.Text == "";
-        }
-
         static Script LoadScript()
         {
             ListFeed listFeed = GetRows();
@@ -222,252 +198,53 @@ namespace ScriptXMLConvert
 
 
 
-        static void BuildSceneBreakdown2()
+        static void BuildSceneBreakdown()
         {
             //Create Script object
             Script script = LoadScript();
 
             //create root
             XmlElement scriptNode = sceneBreakdown.CreateElement("script");
+            AddAttribute(scriptNode, "filmLength", script.TotalTime);
             sceneBreakdown.AppendChild(scriptNode);
 
-            
-
-            XmlElement actNode = null;
-            XmlElement sceneNode = null;
-            string currentScene = "0";
-
-
-
-        }
-
-
-        static void BuildSceneBreakdown()
-        {
-            //create root
-            XmlElement scriptNode = sceneBreakdown.CreateElement("script");
-            sceneBreakdown.AppendChild(scriptNode);
-
-            //get rows from excel
-            IEnumerator<worksheet> sheets = Workbook.Worksheets("SCENE BREAKDOWN - KANSAS.xlsx").GetEnumerator();
-            sheets.MoveNext();
-            Row[] rowsList = sheets.Current.Rows;
-
-            XmlElement actNode = null;
-            XmlElement sceneNode = null;
-            string currentScene = "0";
-
-            foreach (Row row in rowsList)
+            foreach (Act act in script.Acts)
             {
-                //get all the cells in this row
-                Cell[] cellsList = row.Cells;
+                XmlElement actNode = sceneBreakdown.CreateElement("act");
+                AddAttribute(actNode, "number", act.Number);
+                scriptNode.AppendChild(actNode);
 
-                //note:the end of the file has a bunch of rows for excel formatting, want to skip them
-                //HACK:using this to signify the end of the data in the file so appending last actNode to it's parent
-                if (cellsList.Length < 2)
+                foreach (Scene scene in act.Scenes)
                 {
+                    XmlElement sceneNode = sceneBreakdown.CreateElement("scene");
+                    AddAttribute(sceneNode, "number", scene.Number);
+                    AddAttribute(sceneNode, "time", scene.Time);
                     actNode.AppendChild(sceneNode);
-                    scriptNode.AppendChild(actNode);
-                    break;
-                }
 
-                //skip blank row
-                if (IsBlankRow(cellsList))
-                {
-                    //move to next row
-                    continue;
-                }
-
-                //skip first row
-                //if (row.FirstChild.FirstChild.Attributes.GetNamedItem("Type", "urn:schemas-microsoft-com:office:spreadsheet").Value == "String" && row.ChildNodes.Item(1).ChildNodes.Count > 0)
-                if (cellsList[(int)ColumnHeader.Scene].Text == "SCENE" && cellsList[(int)ColumnHeader.Moment].Text == "MOMENT" && cellsList[(int)ColumnHeader.Line].Text == "LINE")
-                {
-                    //move to next row
-                    continue;
-                }
-
-                //skip time and total duration rows
-                if (cellsList[(int)ColumnHeader.Scene].Text == "TIME" || cellsList[(int)ColumnHeader.Scene].Text == "SCRIPT TOTAL DURATION")
-                {
-                    //move to next row
-                    continue;
-                }
-
-
-                //check if this is a row declaring the Act
-                if (IsActRow(cellsList))
-                {
-
-                    //if not the first act child (actNode == null) then add to script parent
-                    if (null != actNode)
+                    foreach(Moment moment in scene.Moments)
                     {
-                        actNode.AppendChild(sceneNode);
-                        scriptNode.AppendChild(actNode);
-                    }
-
-                    //create new act node
-                    actNode = sceneBreakdown.CreateElement("act");
-
-                    //reset scene and currentScene
-                    sceneNode = null;
-                    currentScene = "0";
-
-                    string innerText = cellsList[(int)ColumnHeader.Scene].Text;
-                    string actNum = innerText.Substring(innerText.LastIndexOf(' ') + 1);
-
-                    //add number attribute
-                    XmlAttribute numberAttribute = sceneBreakdown.CreateAttribute("number");
-                    numberAttribute.Value = actNum;
-                    actNode.Attributes.Append(numberAttribute);
-
-                    //move to next row
-                    continue;
-                }
-
-
-                //get scene number
-                string scene = cellsList[(int)ColumnHeader.Scene].Text;
-
-
-                //create new scene node and set the data if new
-                if (scene != currentScene)
-                {
-                    //if not the first scene child (sceneNode == null) then write scene element to parent
-                    if (null != sceneNode)
-                    {
-                        actNode.AppendChild(sceneNode);
-                    }
-
-                    currentScene = scene;
-                    sceneNode = sceneBreakdown.CreateElement("scene");
-
-                    XmlAttribute numberAttribute = sceneBreakdown.CreateAttribute("number");
-                    numberAttribute.Value = scene;
-                    sceneNode.Attributes.Append(numberAttribute);
-                }
-
-                //create another moment node
-                XmlElement momentNode = sceneBreakdown.CreateElement("moment");
-
-                //add title attribute
-                SetMomentAttribute(momentNode, ColumnHeader.Moment, cellsList);
-
-                //add line attribute
-                SetMomentAttribute(momentNode, ColumnHeader.Line, cellsList);
-
-                //add duration attribute
-                SetMomentAttribute(momentNode, ColumnHeader.Duration, cellsList);
-
-                //add location attribute
-                SetMomentAttribute(momentNode, ColumnHeader.Location, cellsList);
-
-                //add sfx attribute
-                SetMomentAttribute(momentNode, ColumnHeader.SFX, cellsList);
-
-
-                //write moment to scene parent
-                sceneNode.AppendChild(momentNode);
-
-
-            }
-            //looped through all rows, still have to add final scene to act and that to the script.
-            //append scene to act
-            actNode.AppendChild(sceneNode);
-            scriptNode.AppendChild(actNode);
-
-            //added some attributes after the fact, and it was easier to just loop through rows again and set the new attributes.
-            SetSceneTimes(rowsList);
-        }
-
-        static void SetMomentAttribute(XmlElement momentNode, ColumnHeader header, Cell[] cells)
-        {
-            //add attribute
-            XmlAttribute attributeNode = null;
-            switch (header)
-            {
-                case ColumnHeader.Duration:
-                    attributeNode = sceneBreakdown.CreateAttribute("duration");
-                    break;
-                case ColumnHeader.Line:
-                    attributeNode = sceneBreakdown.CreateAttribute("line");
-                    break;
-                case ColumnHeader.Moment:
-                    attributeNode = sceneBreakdown.CreateAttribute("title");
-                    break;
-                case ColumnHeader.Location:
-                    attributeNode = sceneBreakdown.CreateAttribute("location");
-                    break;
-                case ColumnHeader.SFX:
-                    attributeNode = sceneBreakdown.CreateAttribute("sfx");
-                    break;
-                default:
-                    Console.WriteLine("Wrong header type given in SetMomentAttribute.");
-                    break;
-            }
-
-            if (null != cells[(int)header])
-            {
-                attributeNode.Value = cells[(int)header].Text;
-            }
-            else
-            {
-                attributeNode.Value = "";
-            }
-            momentNode.Attributes.Append(attributeNode);
-        }
-
-        static void SetSceneTimes(Row[] rows)
-        {
-            //need the current act and scene of each moment for xpath lookup.
-            int currentAct = 0;
-            for (int i = 0; i < rows.Length; i++)
-            {
-                Cell[] cells = rows[i].Cells;
-                if (IsActRow(cells))
-                {
-                    string innerText = cells[(int)ColumnHeader.Scene].Text;
-                    string actNum = innerText.Substring(innerText.LastIndexOf(' ') + 1);
-                    currentAct = int.Parse(actNum);
-                }
-
-                if (cells[(int)ColumnHeader.Scene].Text == "TIME")
-                {
-
-                    if (i + 1 < rows.Length)
-                    {
-                        //TIME row precedes scenes it pertains to , so get correct scene by looking a row ahead.
-                        string scene = rows[i + 1].Cells[(int)ColumnHeader.Scene].Text;
-                        XmlNode sceneNode = sceneBreakdown.SelectSingleNode("script/act[@number='" + currentAct + "']/scene[@number='" + scene + "']");
-                        XmlAttribute timeNode = sceneBreakdown.CreateAttribute("time");
-                        timeNode.Value = cells[(int)ColumnHeader.Duration].Text;
-                        sceneNode.Attributes.Append(timeNode);
+                        XmlElement momentNode = sceneBreakdown.CreateElement("moment");
+                        AddAttribute(momentNode, "title", moment.Title);
+                        AddAttribute(momentNode, "line", moment.Line);
+                        AddAttribute(momentNode, "duration", moment.Duration);
+                        AddAttribute(momentNode, "location", moment.Location);
+                        AddAttribute(momentNode, "sfx", moment.SFX);
+                        sceneNode.AppendChild(momentNode);
                     }
                 }
 
-                if (cells[(int)ColumnHeader.Scene].Text == "SCRIPT TOTAL DURATION")
-                {
-                    XmlAttribute timeNode = sceneBreakdown.CreateAttribute("filmLength");
-                    timeNode.Value = cells[(int)ColumnHeader.Duration].Text;
-                    sceneBreakdown.FirstChild.Attributes.Append(timeNode);
-                }
             }
+
+
+
+
         }
 
-        private static bool IsBlankRow(Cell[] cellsList)
+        static void AddAttribute(XmlElement elementNode, string name, string value)
         {
-            //return cellsList.Item(0).ChildNodes.Count == 0 && cellsList.Item(1).ChildNodes.Count == 0;
-            return NumberOfFilledCells(cellsList) == 0;
-        }
-
-        private static bool IsActRow(Cell[] cellsList)
-        {
-            //check if cell 1 has data and cell 2 has none
-            //if (cellsList.Item(0).ChildNodes.Count == 1 && cellsList.Item(1).ChildNodes.Count == 0)
-            if (NumberOfFilledCells(cellsList) == 1)
-            {
-                return true;
-            }
-            return false;
+            XmlAttribute att = sceneBreakdown.CreateAttribute(name);
+            att.Value = value;
+            elementNode.Attributes.Append(att);
         }
 
 
