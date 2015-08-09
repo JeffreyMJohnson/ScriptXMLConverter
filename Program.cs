@@ -61,7 +61,7 @@ namespace ScriptXMLConvert
 
         }
 
-        
+
         static ListFeed GetRows()
         {
             //OAuth config
@@ -79,9 +79,21 @@ namespace ScriptXMLConvert
 
             //get auth URL
             string authorizationUrl = OAuthUtil.CreateOAuth2AuthorizationUrl(parameters);
-            System.Windows.Forms.Clipboard.Clear();
             Console.WriteLine(authorizationUrl);
-            System.Windows.Forms.Clipboard.SetText(authorizationUrl);
+
+            //occasionally the clipboard decides to not work throwing this exception.  I copy to the clipboard for convenience, so if
+            //doesn't work, user can select and copy the URL manually.
+            try
+            {
+                System.Windows.Forms.Clipboard.Clear();
+                System.Windows.Forms.Clipboard.SetText(authorizationUrl);
+                Console.WriteLine("URL Copied to clipboard.");
+            }
+            catch (System.Runtime.InteropServices.ExternalException e)
+            {
+                Console.WriteLine("There was a problem copying to the clipboard, so copy the URL manually.");
+            }
+
             Console.WriteLine("Please visit the URL above to authorize your OAuth " + "request token.  Once that is complete, type in your access code to "
                 + "continue...");
             parameters.AccessCode = Console.ReadLine();
@@ -124,7 +136,7 @@ namespace ScriptXMLConvert
             ListFeed listFeed = service.Query(listQuery);
             return listFeed;
         }
-        
+
 
         static Script LoadScript()
         {
@@ -142,23 +154,23 @@ namespace ScriptXMLConvert
                 if (sceneValue.Contains("ACT "))
                 {
                     //if not first
-                    if(null != act)
+                    if (null != act)
                     {
                         act.AddScene(scene);
                         scene = null;
                         script.AddAct(act);
                     }
                     act = new Act();
-                    act.Number = sceneValue.Substring(sceneValue.LastIndexOf(' '));
+                    act.Number = sceneValue.Substring(sceneValue.LastIndexOf(' ') + 1);
                     //go to next row
                     continue;
                 }
 
                 //if new scene
-                if(sceneValue.Contains("TIME"))
+                if (sceneValue.Contains("TIME"))
                 {
                     //if not first scene 
-                    if(null != scene)
+                    if (null != scene)
                     {
                         act.AddScene(scene);
                     }
@@ -169,7 +181,7 @@ namespace ScriptXMLConvert
                 }
 
                 //if last element
-                if(sceneValue.Contains("SCRIPT TOTAL"))
+                if (sceneValue.Contains("SCRIPT TOTAL"))
                 {
                     script.TotalTime = row.Elements[(int)ColumnHeader.Duration].Value;
                     //add last scene to last act
@@ -186,7 +198,7 @@ namespace ScriptXMLConvert
                                            row.Elements[(int)ColumnHeader.Duration].Value,
                                            row.Elements[(int)ColumnHeader.Location].Value,
                                            row.Elements[(int)ColumnHeader.SFX].Value);
-                if(scene.Number != row.Elements[(int)ColumnHeader.Scene].Value)
+                if (scene.Number != row.Elements[(int)ColumnHeader.Scene].Value)
                 {
                     scene.Number = row.Elements[(int)ColumnHeader.Scene].Value;
                 }
@@ -221,7 +233,7 @@ namespace ScriptXMLConvert
                     AddAttribute(sceneNode, "time", scene.Time);
                     actNode.AppendChild(sceneNode);
 
-                    foreach(Moment moment in scene.Moments)
+                    foreach (Moment moment in scene.Moments)
                     {
                         XmlElement momentNode = sceneBreakdown.CreateElement("moment");
                         AddAttribute(momentNode, "title", moment.Title);
