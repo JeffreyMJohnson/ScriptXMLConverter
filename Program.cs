@@ -48,7 +48,19 @@ namespace ScriptXMLConvert
         [STAThread]
         static void Main(string[] args)
         {
-            BuildSceneBreakdown();
+            try
+            {
+                BuildSceneBreakdown();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Catastrophic failure occured:");
+                Console.WriteLine("If this continues contact jefjohms@gmail.com");
+                Console.WriteLine("press any key to terminate...");
+                Console.ReadKey();
+                return;
+            }
+
 
             /*
              *This is commented to remove the script text from the outputed data file.  If want it in uncomment the next 2 lines.
@@ -57,7 +69,12 @@ namespace ScriptXMLConvert
             //scriptFileStream = new StreamReader("SCRIPT-CODENAMEKANSAS.txt");
             //AddScriptText();
 
+            Console.WriteLine("Saving xml data file...");
             sceneBreakdown.Save("SceneBreakdown.xml");
+
+            Console.WriteLine("Application finished.");
+            Console.WriteLine("press any key to terminate...");
+            Console.ReadKey();
 
         }
 
@@ -96,9 +113,23 @@ namespace ScriptXMLConvert
 
             Console.WriteLine("Please visit the URL above to authorize your OAuth " + "request token.  Once that is complete, type in your access code to "
                 + "continue...");
+
             parameters.AccessCode = Console.ReadLine();
 
-            OAuthUtil.GetAccessToken(parameters);
+
+            try
+            {
+                OAuthUtil.GetAccessToken(parameters);
+            }
+            catch (System.Net.WebException e)
+            {
+                Console.WriteLine(e.Message);
+                Console.WriteLine("Did you copy/paste the given code exactly?");
+                throw e;
+            }
+
+
+
             string accessToken = parameters.AccessToken;
             Console.WriteLine("OAuth Access Token: " + accessToken);
 
@@ -114,17 +145,31 @@ namespace ScriptXMLConvert
 
             if (feed.Entries.Count == 0)
             {
-                // TODO: There were no spreadsheets, act accordingly.
+                Console.WriteLine("No Spreadsheet found");
+                throw new Exception();
             }
 
-            // TODO: Choose a spreadsheet more intelligently based on your
-            // app's needs.
-            SpreadsheetEntry spreadsheet = (SpreadsheetEntry)feed.Entries[0];
-            Console.WriteLine(spreadsheet.Title.Text);
+            SpreadsheetEntry spreadsheet = null;
+            foreach (SpreadsheetEntry entry in feed.Entries)
+            {
+                if (entry.Title.Text == "SCENE BREAKDOWN - KANSAS")
+                {
+                    spreadsheet = (SpreadsheetEntry)entry;
+                }
+            }
 
-            // Get the first worksheet of the first spreadsheet.
-            // TODO: Choose a worksheet more intelligently based on your
-            // app's needs.
+            if (null == spreadsheet)
+            {
+                Console.WriteLine("Could not find spreadsheet 'SCENE BREAKDOWN - KANSAS'");
+                Console.WriteLine("Did you login with account that has access?");
+                throw new Exception();
+            }
+            else
+            {
+                Console.WriteLine("Spreadsheet 'SCENE BREAKDOWN - KANSAS' found.");
+            }
+
+
             WorksheetFeed wsFeed = spreadsheet.Worksheets;
             WorksheetEntry worksheet = (WorksheetEntry)wsFeed.Entries[0];
 
@@ -134,6 +179,11 @@ namespace ScriptXMLConvert
             // Fetch the list feed of the worksheet.
             ListQuery listQuery = new ListQuery(listFeedLink.HRef.ToString());
             ListFeed listFeed = service.Query(listQuery);
+            if (listFeed.Entries.Count < 1)
+            {
+                Console.WriteLine("No rows returned with the data.\nDid you sign on with account that has access to spreadsheet?");
+            }
+
             return listFeed;
         }
 
