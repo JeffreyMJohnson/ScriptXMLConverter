@@ -52,10 +52,9 @@ namespace ScriptXMLConvert
         [STAThread]
         static void Main(string[] args)
         {
-            BuildSceneBreakdown();
             try
             {
-                //BuildSceneBreakdown();
+                BuildSceneBreakdown();
             }
             catch (Exception e)
             {
