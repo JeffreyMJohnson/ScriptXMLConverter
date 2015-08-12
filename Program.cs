@@ -2,7 +2,8 @@
 using Google.GData.Spreadsheets;
 using System;
 using System.Xml;
-
+using Excel;
+using System.Collections.Generic;
 
 namespace ScriptXMLConvert
 {
@@ -36,6 +37,9 @@ namespace ScriptXMLConvert
             SFX
         }
 
+        //this switch is for which to use for data, local excel sheet or google sheet in cloud.
+        private static bool usingExcel = true;
+
         private static XmlDocument sceneBreakdown = new XmlDocument();
 
         /*
@@ -48,9 +52,10 @@ namespace ScriptXMLConvert
         [STAThread]
         static void Main(string[] args)
         {
+            BuildSceneBreakdown();
             try
             {
-                BuildSceneBreakdown();
+                //BuildSceneBreakdown();
             }
             catch (Exception e)
             {
@@ -77,6 +82,8 @@ namespace ScriptXMLConvert
             Console.ReadKey();
 
         }
+
+
 
 
         static ListFeed GetRows()
@@ -190,73 +197,176 @@ namespace ScriptXMLConvert
 
         static Script LoadScript()
         {
-            ListFeed listFeed = GetRows();
             Script script = new Script();
-            Act act = null;
-            Scene scene = null;
-
-            //loop rows
-            foreach (ListEntry row in listFeed.Entries)
+            if (!usingExcel)
             {
-                string sceneValue = row.Elements[(int)ColumnHeader.Scene].Value;
+                Console.WriteLine("Using Google sheet on cloud for data...");
+                ListFeed listFeed = GetRows();
+                Act act = null;
+                Scene scene = null;
 
-                //is act label
-                if (sceneValue.Contains("ACT "))
+                //loop rows
+                foreach (ListEntry row in listFeed.Entries)
                 {
-                    //if not first
-                    if (null != act)
+                    string sceneValue = row.Elements[(int)ColumnHeader.Scene].Value;
+
+                    //is act label
+                    if (sceneValue.Contains("ACT "))
                     {
+                        //if not first
+                        if (null != act)
+                        {
+                            act.AddScene(scene);
+                            scene = null;
+                            script.AddAct(act);
+                        }
+                        act = new Act();
+                        act.Number = sceneValue.Substring(sceneValue.LastIndexOf(' ') + 1);
+                        //go to next row
+                        continue;
+                    }
+
+                    //if new scene
+                    if (sceneValue.Contains("TIME"))
+                    {
+                        //if not first scene 
+                        if (null != scene)
+                        {
+                            act.AddScene(scene);
+                        }
+                        scene = new Scene();
+                        scene.Time = row.Elements[(int)ColumnHeader.Duration].Value;
+                        //go to next row
+                        continue;
+                    }
+
+                    //if last element
+                    if (sceneValue.Contains("SCRIPT TOTAL"))
+                    {
+                        script.TotalTime = row.Elements[(int)ColumnHeader.Duration].Value;
+                        //add last scene to last act
                         act.AddScene(scene);
-                        scene = null;
+                        //add last act to script
                         script.AddAct(act);
+                        //all done no need to continue checking rows
+                        break;
                     }
-                    act = new Act();
-                    act.Number = sceneValue.Substring(sceneValue.LastIndexOf(' ') + 1);
-                    //go to next row
-                    continue;
-                }
 
-                //if new scene
-                if (sceneValue.Contains("TIME"))
-                {
-                    //if not first scene 
-                    if (null != scene)
+                    //not above so it's a new moment
+                    Moment moment = new Moment(row.Elements[(int)ColumnHeader.Moment].Value,
+                                               row.Elements[(int)ColumnHeader.Line].Value,
+                                               row.Elements[(int)ColumnHeader.Duration].Value,
+                                               row.Elements[(int)ColumnHeader.Location].Value,
+                                               row.Elements[(int)ColumnHeader.SFX].Value);
+                    if (scene.Number != row.Elements[(int)ColumnHeader.Scene].Value)
                     {
-                        act.AddScene(scene);
+                        scene.Number = row.Elements[(int)ColumnHeader.Scene].Value;
                     }
-                    scene = new Scene();
-                    scene.Time = row.Elements[(int)ColumnHeader.Duration].Value;
-                    //go to next row
-                    continue;
+                    scene.AddMoment(moment);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Using .xlsx Excel sheet for data....");
+                //get rows from excel
+                IEnumerator<worksheet> sheets = Workbook.Worksheets("SCENE BREAKDOWN - KANSAS.xlsx").GetEnumerator();
+
+                try
+                {
+                    sheets.MoveNext();
+                }
+                catch (System.IO.FileNotFoundException e)
+                {
+                    Console.WriteLine(e.Message);
+                    Console.WriteLine("Is 'SCENE BREAKDOWN - KANSAS.xlsx' located in working directory?");
+                    throw e;
                 }
 
-                //if last element
-                if (sceneValue.Contains("SCRIPT TOTAL"))
-                {
-                    script.TotalTime = row.Elements[(int)ColumnHeader.Duration].Value;
-                    //add last scene to last act
-                    act.AddScene(scene);
-                    //add last act to script
-                    script.AddAct(act);
-                    //all done no need to continue checking rows
-                    break;
-                }
+                Row[] rows = sheets.Current.Rows;
 
-                //not above so it's a new moment
-                Moment moment = new Moment(row.Elements[(int)ColumnHeader.Moment].Value,
-                                           row.Elements[(int)ColumnHeader.Line].Value,
-                                           row.Elements[(int)ColumnHeader.Duration].Value,
-                                           row.Elements[(int)ColumnHeader.Location].Value,
-                                           row.Elements[(int)ColumnHeader.SFX].Value);
-                if (scene.Number != row.Elements[(int)ColumnHeader.Scene].Value)
+                Act act = null;
+                Scene scene = null;
+
+                //loop rows
+                foreach (Row row in rows)
                 {
-                    scene.Number = row.Elements[(int)ColumnHeader.Scene].Value;
+                    //skip the first row;
+                    if(GetCellText(row, ColumnHeader.Scene).Contains("SCENE") && GetCellText(row, ColumnHeader.Moment).Contains("MOMENT"))
+                    {
+                        continue;
+                    }
+                    //skip blank lines
+                    if(GetCellText(row, ColumnHeader.Scene) == "" && GetCellText(row, ColumnHeader.Moment) == "")
+                    {
+                        continue;
+                    }
+
+                    string sceneValue = row.Cells[(int)ColumnHeader.Scene].Text;
+
+                    //is act label
+                    if (sceneValue.Contains("ACT "))
+                    {
+                        //if not first
+                        if (null != act)
+                        {
+                            act.AddScene(scene);
+                            scene = null;
+                            script.AddAct(act);
+                        }
+                        act = new Act();
+                        act.Number = sceneValue.Substring(sceneValue.LastIndexOf(' ') + 1);
+                        //go to next row
+                        continue;
+                    }
+
+                    //if new scene
+                    if (sceneValue.Contains("TIME"))
+                    {
+                        //if not first scene 
+                        if (null != scene)
+                        {
+                            act.AddScene(scene);
+                        }
+                        scene = new Scene();
+                        scene.Time = row.Cells[(int)ColumnHeader.Duration].Text;
+                        //go to next row
+                        continue;
+                    }
+
+                    //if last element
+                    if (sceneValue.Contains("SCRIPT TOTAL"))
+                    {
+                        script.TotalTime = row.Cells[(int)ColumnHeader.Duration].Text;
+                        //add last scene to last act
+                        act.AddScene(scene);
+                        //add last act to script
+                        script.AddAct(act);
+                        //all done no need to continue checking rows
+                        break;
+                    }
+
+                    //not above so it's a new moment
+                    Moment moment = new Moment(row.Cells[(int)ColumnHeader.Moment].Text,
+                                               row.Cells[(int)ColumnHeader.Line].Text,
+                                               row.Cells[(int)ColumnHeader.Duration].Text,
+                                               row.Cells[(int)ColumnHeader.Location].Text,
+                                               row.Cells[(int)ColumnHeader.SFX].Text);
+                    if (scene.Number != row.Cells[(int)ColumnHeader.Scene].Text)
+                    {
+                        scene.Number = row.Cells[(int)ColumnHeader.Scene].Text;
+                    }
+                    scene.AddMoment(moment);
                 }
-                scene.AddMoment(moment);
             }
             return script;
 
         }
+
+        static string GetCellText(Row row, ColumnHeader column)
+        {
+            return row.Cells[(int)column].Text;
+        }
+
 
 
 
