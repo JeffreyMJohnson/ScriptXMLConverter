@@ -300,7 +300,7 @@ namespace ScriptXMLConvert
                         continue;
                     }
 
-                    string sceneValue = row.Cells[(int)ColumnHeader.Scene].Text;
+                    string sceneValue = GetCellText(row, ColumnHeader.Scene);
 
                     //is act label
                     if (sceneValue.Contains("ACT "))
@@ -327,7 +327,7 @@ namespace ScriptXMLConvert
                             act.AddScene(scene);
                         }
                         scene = new Scene();
-                        scene.Time = row.Cells[(int)ColumnHeader.Duration].Text;
+                        scene.Time = GetCellText(row, ColumnHeader.Duration);
                         //go to next row
                         continue;
                     }
@@ -335,7 +335,7 @@ namespace ScriptXMLConvert
                     //if last element
                     if (sceneValue.Contains("SCRIPT TOTAL"))
                     {
-                        script.TotalTime = row.Cells[(int)ColumnHeader.Duration].Text;
+                        script.TotalTime = GetCellText(row, ColumnHeader.Duration);
                         //add last scene to last act
                         act.AddScene(scene);
                         //add last act to script
@@ -345,14 +345,15 @@ namespace ScriptXMLConvert
                     }
 
                     //not above so it's a new moment
-                    Moment moment = new Moment(row.Cells[(int)ColumnHeader.Moment].Text,
-                                               row.Cells[(int)ColumnHeader.Line].Text,
-                                               row.Cells[(int)ColumnHeader.Duration].Text,
-                                               row.Cells[(int)ColumnHeader.Location].Text,
-                                               row.Cells[(int)ColumnHeader.SFX].Text);
-                    if (scene.Number != row.Cells[(int)ColumnHeader.Scene].Text)
+                    Moment moment = new Moment(GetCellText(row, ColumnHeader.Moment),
+                                               GetCellText(row, ColumnHeader.Line),
+                                               GetCellText(row, ColumnHeader.Duration),
+                                               GetCellText(row, ColumnHeader.Location),
+                                               GetCellText(row, ColumnHeader.SFX));
+
+                    if (scene.Number != GetCellText(row, ColumnHeader.Scene))
                     {
-                        scene.Number = row.Cells[(int)ColumnHeader.Scene].Text;
+                        scene.Number = GetCellText(row, ColumnHeader.Scene);
                     }
                     scene.AddMoment(moment);
                 }
@@ -363,6 +364,10 @@ namespace ScriptXMLConvert
 
         static string GetCellText(Row row, ColumnHeader column)
         {
+            if(null == row.Cells[(int)column])
+            {
+                return "";
+            }
             return row.Cells[(int)column].Text;
         }
 
