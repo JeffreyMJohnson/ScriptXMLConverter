@@ -33,7 +33,13 @@ namespace ScriptXMLConvert
             //verify file found
             try
             {
-                sheets.MoveNext();
+                //bugfix for multiple worksheets.
+                //unfortunately the library I use to access the excel file does not expose a way to differentiate sheets other
+                //than row col count.  Very hacky.
+                do
+                {
+                    sheets.MoveNext();
+                } while (sheets.Current.Rows.Count() < 100);
             }
             catch (System.IO.FileNotFoundException e)
             {
@@ -41,6 +47,13 @@ namespace ScriptXMLConvert
                 Console.WriteLine("Is '" + path + "' located in working directory?");
                 throw e;
             }
+            catch (System.NullReferenceException e)
+            {
+                Console.WriteLine(e.Message);
+                Console.WriteLine("Problem finding correct worksheet.");
+                throw e;
+            }
+
             return sheets;
         }
 
