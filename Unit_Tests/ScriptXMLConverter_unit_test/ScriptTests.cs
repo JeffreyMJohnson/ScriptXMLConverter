@@ -13,7 +13,7 @@ namespace ScriptXMLConverter_unit_test
     public class ScriptTests
     {
         const string TEST_DATA_PATH_1 = @"..\..\Data\TestData_1.xlsx";
-
+            
         [TestInitialize]
         public void TestInit()
         {
